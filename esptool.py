@@ -102,7 +102,7 @@ class ESPROM:
     @staticmethod
     def checksum(data, state=ESP_CHECKSUM_MAGIC):
         for b in data:
-            if isinstance(b, (str,  bytes)):
+            if sys.version_info.major < 3:
                 b = ord(b)
             state ^= b
         return state
