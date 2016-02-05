@@ -84,7 +84,7 @@ class ESPROM:
                 if c == b'\xdc':
                     b = b + b'\xc0'
                 elif c == b'\xdd':
-                    b = b + 'b\xdb'
+                    b = b + b'\xdb'
                 else:
                     raise FatalError('Invalid SLIP escape')
             else:
@@ -102,7 +102,9 @@ class ESPROM:
     @staticmethod
     def checksum(data, state=ESP_CHECKSUM_MAGIC):
         for b in data:
-            state ^= ord(b)
+            if isinstance(b, (str,  bytes)):
+                b = ord(b)
+            state ^= b
         return state
 
     """ Send a request and read the response """
@@ -302,14 +304,14 @@ class ESPROM:
         self.mem_finish(0x4010001c)
 
         # Fetch the data
-        data = ''
+        data = b''
         for _ in range(count):
             if self._port.read(1) != b'\xc0':
                 raise FatalError('Invalid head of packet (sflash read)')
 
             data += self.read(size)
 
-            if self._port.read(1) != chr(0xc0):
+            if self._port.read(1) != b"\xc0":
                 raise FatalError('Invalid end of packet (sflash read)')
 
         return data
