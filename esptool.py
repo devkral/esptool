@@ -60,10 +60,10 @@ class ESPROM:
     ESP_OTP_MAC1    = 0x3ff00054
 
     # Sflash stub: an assembly routine to read from spi flash and send to host
-    SFLASH_STUB     = b"\x80\x3c\x00\x40\x1c\x4b\x00\x40\x21\x11\x00\x40\x00\x80" +\
-                      b"\xfe\x3f\xc1\xfb\xff\xd1\xf8\xff\x2d\x0d\x31\xfd\xff\x41\xf7\xff\x4a" +\
-                      b"\xdd\x51\xf9\xff\xc0\x05\x00\x21\xf9\xff\x31\xf3\xff\x41\xf5\xff\xc0" +\
-                      b"\x04\x00\x0b\xcc\x56\xec\xfd\x06\xff\xff\x00\x00"
+    SFLASH_STUB     = (b"\x80\x3c\x00\x40\x1c\x4b\x00\x40\x21\x11\x00\x40\x00\x80" +
+                      b"\xfe\x3f\xc1\xfb\xff\xd1\xf8\xff\x2d\x0d\x31\xfd\xff\x41\xf7\xff\x4a" +
+                      b"\xdd\x51\xf9\xff\xc0\x05\x00\x21\xf9\xff\x31\xf3\xff\x41\xf5\xff\xc0" +
+                      b"\x04\x00\x0b\xcc\x56\xec\xfd\x06\xff\xff\x00\x00")
 
     def __init__(self, port=0, baud=ESP_ROM_BAUD):
         self._port = serial.Serial(port)
@@ -349,28 +349,28 @@ class ESPFirmwareImage:
         self.flash_size_freq = 0
 
         if filename is not None:
-            f = open(filename, 'rb')
-            (magic, segments, self.flash_mode, self.flash_size_freq, self.entrypoint) = struct.unpack('<BBBBI', f.read(8))
+            with open(filename, 'rb') as f:
+                (magic, segments, self.flash_mode, self.flash_size_freq, self.entrypoint) = struct.unpack('<BBBBI', f.read(8))
 
-            # some sanity check
-            if magic != ESPROM.ESP_IMAGE_MAGIC or segments > 16:
-                raise FatalError('Invalid firmware image')
+                # some sanity check
+                if magic != ESPROM.ESP_IMAGE_MAGIC or segments > 16:
+                    raise FatalError('Invalid firmware image')
 
-            for i in range(segments):
-                (offset, size) = struct.unpack('<II', f.read(8))
-                if offset > 0x40200000 or offset < 0x3ffe0000 or size > 65536:
-                    raise FatalError('Suspicious segment 0x%x, length %d' % (offset, size))
-                segment_data = f.read(size)
-                if len(segment_data) < size:
-                    raise FatalError('End of file reading segment 0x%x, length %d (actual length %d)' % (offset, size, len(segment_data)))
-                self.segments.append((offset, size, segment_data))
+                for i in range(segments):
+                    (offset, size) = struct.unpack('<II', f.read(8))
+                    if offset > 0x40200000 or offset < 0x3ffe0000 or size > 65536:
+                        raise FatalError('Suspicious segment 0x%x, length %d' % (offset, size))
+                    segment_data = f.read(size)
+                    if len(segment_data) < size:
+                        raise FatalError('End of file reading segment 0x%x, length %d (actual length %d)' % (offset, size, len(segment_data)))
+                    self.segments.append((offset, size, segment_data))
 
-            # Skip the padding. The checksum is stored in the last byte so that the
-            # file is a multiple of 16 bytes.
-            align = 15 - (f.tell() % 16)
-            f.seek(align, 1)
+                # Skip the padding. The checksum is stored in the last byte so that the
+                # file is a multiple of 16 bytes.
+                align = 15 - (f.tell() % 16)
+                f.seek(align, 1)
 
-            self.checksum = ord(f.read(1))
+                self.checksum = ord(f.read(1))
 
     def add_segment(self, addr, data):
         # Data should be aligned on word boundary
@@ -498,7 +498,10 @@ class FatalError(RuntimeError):
         Return a fatal error object that includes the hex values of
         'result' as a string formatted argument.
         """
-        return FatalError(message % ", ".join(hex(ord(x)) for x in result))
+        if sys.version_info.major < 3 or not isinstance(result, bytes):
+            return FatalError(message % ", ".join(hex(ord(x)) for x in result))
+        else:
+            return FatalError(message % ", ".join(hex(x) for x in result))
 
 
 # "Operation" commands, executable at command line. One function each
@@ -684,7 +687,10 @@ def verify_flash(esp, args):
             try:
                 if args.diff == 'yes':
                     for d in diff:
-                        print('   %08x %02x %02x' % (address + d, ord(flash[d]), ord(image[d])))
+                        if sys.version_info.major < 3:
+                            print('   %08x %02x %02x' % (address + d, ord(flash[d]), ord(image[d])))
+                        else:
+                            print('   %08x %02x %02x' % (address + d, flash[d], image[d]))
             except AttributeError:
                 pass  # if performing write_flash --verify, there is no .diff attribute
     if differences:
