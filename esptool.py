@@ -570,10 +570,10 @@ def write_flash(esp, args):
             sys.stdout.flush()
             block = image[0:esp.ESP_FLASH_BLOCK]
             # Fix sflash config data
-            if address == 0 and seq == 0 and block[0] == '\xe9':
+            if address == 0 and seq == 0 and block[0:1] == b'\xe9':
                 block = block[0:2] + flash_info + block[4:]
             # Pad the last block
-            block = block + '\xff' * (esp.ESP_FLASH_BLOCK - len(block))
+            block = block + b'\xff' * (esp.ESP_FLASH_BLOCK - len(block))
             esp.flash_block(block, seq)
             image = image[esp.ESP_FLASH_BLOCK:]
             seq += 1
